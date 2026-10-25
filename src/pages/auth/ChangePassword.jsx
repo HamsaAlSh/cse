@@ -1,21 +1,16 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Lock, ArrowLeft, Loader2, Eye, EyeOff } from 'lucide-react';
-import axiosClient from '../../api/axiosClient';
-import { useAuth } from '../../context/AuthContext';
 
 export default function ChangePassword() {
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  
-  // حالة إظهار/إخفاء كلمة المرور
   const [showPasswords, setShowPasswords] = useState(false);
-  
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
   
-  const { user, fetchUser, logout } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
@@ -27,24 +22,14 @@ export default function ChangePassword() {
     }
 
     setIsLoading(true);
-    try {
-      await axiosClient.post('/change-password', {
-        current_password: currentPassword,
-        new_password: newPassword,
-        new_password_confirmation: confirmPassword,
-      });
-
-      await fetchUser();
-      
-      if (user.role === 'admin') navigate('/admin/dashboard');
-      else if (user.role === 'supervisor') navigate('/supervisor/dashboard');
-      else navigate('/volunteer/dashboard');
-
-    } catch (err) {
-      setError(err.response?.data?.message || 'حدث خطأ أثناء تغيير كلمة المرور');
-    } finally {
+    // محاكاة إرسال الطلب (للتجربة فقط)
+    setTimeout(() => {
       setIsLoading(false);
-    }
+      setIsSuccess(true);
+      setTimeout(() => {
+        navigate('/login'); // العودة لتسجيل الدخول بعد التجربة
+      }, 2000);
+    }, 1000);
   };
 
   return (
@@ -64,8 +49,13 @@ export default function ChangePassword() {
           </div>
         )}
 
+        {isSuccess && (
+          <div className="bg-green-50 text-green-600 p-3 rounded-xl text-sm text-center mb-6 border border-green-100">
+            تم تغيير كلمة المرور بنجاح! (وضع التجربة)
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} className="space-y-4">
-          
           {/* كلمة المرور الحالية */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">كلمة المرور الحالية</label>
@@ -142,10 +132,6 @@ export default function ChangePassword() {
             )}
           </button>
         </form>
-
-        <button onClick={logout} className="w-full text-center text-gray-500 text-sm mt-6 hover:text-gray-800 transition-colors">
-          العودة لتسجيل الدخول
-        </button>
       </div>
     </div>
   );
