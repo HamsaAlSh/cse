@@ -114,7 +114,7 @@ export default function ChangePassword() {
             </div>
           </div>
 
-          {/* 3. تأكيد كلمة المرور الجديدة */}
+          {/* 3.   تأكيد كلمة المرور الجديدة */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">تأكيد كلمة المرور الجديدة</label>
             <div className="relative">

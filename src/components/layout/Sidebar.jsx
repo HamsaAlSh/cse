@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { 
   LayoutDashboard, Users, CalendarDays, Clock, 
-  UserCheck, X, Lock, Eye, EyeOff, Loader2, Mail, Phone, Briefcase
+  UserCheck, X, Lock, Eye, EyeOff, Loader2, Mail, Phone, Briefcase, LogOut
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import axiosClient from '../../api/axiosClient';
@@ -15,7 +15,12 @@ export default function Sidebar({ isOpen, onClose }) {
   const [isFetchingUser, setIsFetchingUser] = useState(false);
   
   const [passwords, setPasswords] = useState({ current: '', new: '', confirm: '' });
-  const [showPasswords, setShowPasswords] = useState(false);
+  
+  // فصل حالة الإظهار لكل حقل على حدة
+  const [showCurrent, setShowCurrent] = useState(false);
+  const [showNew, setShowNew] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [passwordMessage, setPasswordMessage] = useState({ type: '', text: '' });
 
@@ -44,6 +49,9 @@ export default function Sidebar({ isOpen, onClose }) {
     setIsFetchingUser(true);
     setPasswordMessage({ type: '', text: '' });
     setPasswords({ current: '', new: '', confirm: '' });
+    setShowCurrent(false);
+    setShowNew(false);
+    setShowConfirm(false);
 
     try {
       const response = await axiosClient.get('/user');
@@ -106,7 +114,7 @@ export default function Sidebar({ isOpen, onClose }) {
           ))}
         </nav>
 
-        <div className="p-4 border-t border-gray-100">
+        <div className="p-4 border-t border-gray-100 space-y-3">
           <button onClick={handleOpenProfile} className="w-full flex items-center gap-3 p-2 rounded-xl hover:bg-gray-50 transition-colors text-right">
             <div className="w-10 h-10 rounded-full bg-brand-100 text-brand-600 flex items-center justify-center font-bold text-lg shrink-0">
               {user?.name?.charAt(0)}
@@ -115,6 +123,14 @@ export default function Sidebar({ isOpen, onClose }) {
               <p className="font-bold text-gray-800 truncate">{user?.name}</p>
               <p className="text-xs text-gray-500">{user?.role === 'admin' ? 'مدير النظام' : user?.role === 'supervisor' ? 'مشرف' : 'متطوع'}</p>
             </div>
+          </button>
+
+          <button 
+            onClick={logout} 
+            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-red-50 text-red-600 hover:bg-red-100 rounded-xl transition-colors font-medium text-sm"
+          >
+            <LogOut className="w-4 h-4" />
+            تسجيل الخروج
           </button>
         </div>
       </aside>
@@ -149,14 +165,67 @@ export default function Sidebar({ isOpen, onClose }) {
                 )}
 
                 <form onSubmit={handleChangePassword} className="space-y-3">
-                  <input type={showPasswords ? "text" : "password"} placeholder="كلمة المرور الحالية" required value={passwords.current} onChange={(e) => setPasswords({...passwords, current: e.target.value})} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm text-left" dir="ltr" />
-                  <input type={showPasswords ? "text" : "password"} placeholder="كلمة المرور الجديدة" required value={passwords.new} onChange={(e) => setPasswords({...passwords, new: e.target.value})} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm text-left" dir="ltr" />
+                  
+                  {/* الحقل الأول: كلمة المرور الحالية */}
                   <div className="relative">
-                    <input type={showPasswords ? "text" : "password"} placeholder="تأكيد كلمة المرور الجديدة" required value={passwords.confirm} onChange={(e) => setPasswords({...passwords, confirm: e.target.value})} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm text-left" dir="ltr" />
-                    <button type="button" onClick={() => setShowPasswords(!showPasswords)} className="absolute left-3 top-2.5 text-gray-400 hover:text-gray-600">
-                      {showPasswords ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    <input 
+                      type={showCurrent ? "text" : "password"} 
+                      placeholder="كلمة المرور الحالية" 
+                      required 
+                      value={passwords.current} 
+                      onChange={(e) => setPasswords({...passwords, current: e.target.value})} 
+                      className="w-full pl-4 pr-10 py-2.5 rounded-xl border border-gray-200 text-sm text-left" 
+                      dir="ltr" 
+                    />
+                    <button 
+                      type="button" 
+                      onClick={() => setShowCurrent(!showCurrent)} 
+                      className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600"
+                    >
+                      {showCurrent ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
                   </div>
+
+                  {/* الحقل الثاني: كلمة المرور الجديدة */}
+                  <div className="relative">
+                    <input 
+                      type={showNew ? "text" : "password"} 
+                      placeholder="كلمة المرور الجديدة" 
+                      required 
+                      value={passwords.new} 
+                      onChange={(e) => setPasswords({...passwords, new: e.target.value})} 
+                      className="w-full pl-4 pr-10 py-2.5 rounded-xl border border-gray-200 text-sm text-left" 
+                      dir="ltr" 
+                    />
+                    <button 
+                      type="button" 
+                      onClick={() => setShowNew(!showNew)} 
+                      className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600"
+                    >
+                      {showNew ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+
+                  {/* الحقل الثالث: تأكيد كلمة المرور */}
+                  <div className="relative">
+                    <input 
+                      type={showConfirm ? "text" : "password"} 
+                      placeholder="تأكيد كلمة المرور الجديدة" 
+                      required 
+                      value={passwords.confirm} 
+                      onChange={(e) => setPasswords({...passwords, confirm: e.target.value})} 
+                      className="w-full pl-4 pr-10 py-2.5 rounded-xl border border-gray-200 text-sm text-left" 
+                      dir="ltr" 
+                    />
+                    <button 
+                      type="button" 
+                      onClick={() => setShowConfirm(!showConfirm)} 
+                      className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600"
+                    >
+                      {showConfirm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+
                   <button type="submit" disabled={isChangingPassword} className="w-full bg-brand-500 hover:bg-brand-600 text-white py-2.5 rounded-xl font-medium text-sm disabled:opacity-70 flex justify-center items-center gap-2 mt-2">
                     {isChangingPassword ? <Loader2 className="w-4 h-4 animate-spin" /> : 'حفظ كلمة المرور'}
                   </button>
