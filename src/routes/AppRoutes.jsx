@@ -13,8 +13,7 @@ import SupervisorDashboard from '../pages/supervisor/SupervisorDashboard';
 import Applicants from '../pages/supervisor/Applicants';
 import VolunteerDashboard from '../pages/volunteer/VolunteerDashboard';
 import AvailableSessions from '../pages/volunteer/AvailableSessions';
-import MySchedule from '../pages/volunteer/MySchedule'; // <-- سيتم إنشاؤه
-import VolunteerHours from '../pages/volunteer/VolunteerHours'; // <-- سيتم إنشاؤه
+import MySchedule from '../pages/volunteer/MySchedule'; // تم استيراده
 import Unauthorized from '../pages/Unauthorized';
 
 export const AppRoutes = () => {
@@ -37,28 +36,22 @@ export const AppRoutes = () => {
         </Route>
 
         <Route element={<DashboardLayout />}>
-          
-          {/* مسارات المدير */}
           <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
             <Route path="/admin/dashboard" element={<AdminDashboard />} />
             <Route path="/admin/volunteers" element={<ManageVolunteers />} />
             <Route path="/admin/activities" element={<ManageActivities />} />
           </Route>
 
-          {/* مسارات المشرف (التي تظهر فقط للمشرفين) */}
           <Route element={<ProtectedRoute allowedRoles={['supervisor']} />}>
             <Route path="/supervisor/dashboard" element={<SupervisorDashboard />} />
             <Route path="/supervisor/applicants" element={<Applicants />} />
           </Route>
 
-          {/* مسارات المتطوع (تشمل وظائف المشرف إذا كان متطوعاً) */}
           <Route element={<ProtectedRoute allowedRoles={['volunteer']} />}>
             <Route path="/volunteer/dashboard" element={<VolunteerDashboard />} />
-            <Route path="/volunteer/sessions" element={<AvailableSessions />} /> 
+            <Route path="/volunteer/sessions" element={<AvailableSessions />} />
             <Route path="/volunteer/my-schedule" element={<MySchedule />} />
-            <Route path="/volunteer/hours" element={<VolunteerHours />} />
           </Route>
-
         </Route>
 
         <Route path="*" element={

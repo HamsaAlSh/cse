@@ -6,9 +6,9 @@ const AuthContext = createContext();
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(localStorage.getItem('access_token') || null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true); // نبدأ بـ true حتى يتم التحقق
 
-  // جلب بيانات المستخدم إذا كان التوكن موجوداً
+  // جلب بيانات المستخدم إذا كان التوكن موجوداً (عند فتح الصفحة أو الريفريش)
   useEffect(() => {
     const fetchUser = async () => {
       if (token) {
@@ -16,9 +16,13 @@ export const AuthProvider = ({ children }) => {
           const response = await axiosClient.get('/user');
           setUser(response.data.user);
         } catch (error) {
-          logout(); // إذا كان التوكن غير صالح
+          // إذا كان التوكن غير صالح، قم بتسجيل الخروج
+          localStorage.removeItem('access_token');
+          setToken(null);
+          setUser(null);
         }
       }
+      setIsLoading(false); // انتهينا من التحقق
     };
     fetchUser();
   }, [token]);
@@ -46,7 +50,6 @@ export const AuthProvider = ({ children }) => {
     setUser(null);
   };
 
-  // دالة لجلب بيانات المستخدم المحدثة (نحتاجها بعد تغيير كلمة المرور)
   const fetchUser = async () => {
     try {
       const response = await axiosClient.get('/user');
@@ -58,7 +61,7 @@ export const AuthProvider = ({ children }) => {
 
   return (
     <AuthContext.Provider value={{ user, token, isLoading, login, logout, fetchUser }}>
-      {children}
+      {!isLoading && children} {/* لا تعرض التطبيق حتى ينتهي التحقق */}
     </AuthContext.Provider>
   );
 };
