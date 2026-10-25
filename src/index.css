@@ -1,0 +1,23 @@
+@import "tailwindcss";
+
+@theme {
+  /* تعريف الخط */
+  --font-sans: "IBM Plex Sans Arabic", ui-sans-serif, system-ui, sans-serif;
+
+  /* تعريف ألوان البراند (CSE Unit) */
+  --color-brand-50: #fdf2f4;
+  --color-brand-100: #fbe6e9;
+  --color-brand-500: #8b1c36;
+  --color-brand-600: #71152b;
+  --color-brand-900: #3d0b17;
+
+  /* تعريف لون الخلفية (Surface) */
+  --color-surface: #FAFAFA;
+}
+
+/* تأكيد تطبيق الخط والخلفية على الجسم */
+@layer base {
+  body {
+    @apply bg-surface text-gray-800 antialiased font-sans;
+  }
+}
