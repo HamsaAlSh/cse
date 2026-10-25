@@ -1,16 +1,14 @@
 import { createContext, useState, useEffect, useContext } from 'react';
 import axiosClient from '../api/axiosClient';
 
-// 1. إنشاء الـ Context
 const AuthContext = createContext();
 
-// 2. مزود الحالة (Provider)
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(localStorage.getItem('access_token') || null);
   const [isLoading, setIsLoading] = useState(false);
 
-  // جلب بيانات المستخدم إذا كان التوكن موجوداً عند فتح التطبيق
+  // جلب بيانات المستخدم إذا كان التوكن موجوداً
   useEffect(() => {
     const fetchUser = async () => {
       if (token) {
@@ -18,15 +16,13 @@ export const AuthProvider = ({ children }) => {
           const response = await axiosClient.get('/user');
           setUser(response.data.user);
         } catch (error) {
-          // إذا كان التوكن غير صالح، قم بتسجيل الخروج
-          logout();
+          logout(); // إذا كان التوكن غير صالح
         }
       }
     };
     fetchUser();
   }, [token]);
 
-  // دالة تسجيل الدخول (مربوطة بـ axios)
   const login = async (email, password) => {
     setIsLoading(true);
     try {
@@ -44,14 +40,13 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // دالة تسجيل الخروج
   const logout = () => {
     localStorage.removeItem('access_token');
     setToken(null);
     setUser(null);
   };
 
-  // دالة تحديث بيانات المستخدم
+  // دالة لجلب بيانات المستخدم المحدثة (نحتاجها بعد تغيير كلمة المرور)
   const fetchUser = async () => {
     try {
       const response = await axiosClient.get('/user');
@@ -68,7 +63,6 @@ export const AuthProvider = ({ children }) => {
   );
 };
 
-// 3. Hook لاستخدام الـ Context بسهولة
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) throw new Error('useAuth must be used within AuthProvider');
