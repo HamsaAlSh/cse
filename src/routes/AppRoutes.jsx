@@ -13,6 +13,8 @@ import SupervisorDashboard from '../pages/supervisor/SupervisorDashboard';
 import Applicants from '../pages/supervisor/Applicants';
 import VolunteerDashboard from '../pages/volunteer/VolunteerDashboard';
 import AvailableSessions from '../pages/volunteer/AvailableSessions';
+import MySchedule from '../pages/volunteer/MySchedule'; // <-- سيتم إنشاؤه
+import VolunteerHours from '../pages/volunteer/VolunteerHours'; // <-- سيتم إنشاؤه
 import Unauthorized from '../pages/Unauthorized';
 
 export const AppRoutes = () => {
@@ -27,14 +29,13 @@ export const AppRoutes = () => {
   return (
     <BrowserRouter>
       <Routes>
-        {/* المسارات العامة */}
         <Route path="/login" element={!user ? <Login /> : <Navigate to="/" />} />
         <Route path="/unauthorized" element={<Unauthorized />} />
 
-        {/* ====== مسار تغيير كلمة المرور (متاح للجميع مؤقتاً للتجربة) ====== */}
-        <Route path="/change-password" element={<ChangePassword />} />
+        <Route element={<ProtectedRoute />}>
+          <Route path="/change-password" element={<ChangePassword />} />
+        </Route>
 
-        {/* الهيكل الموحد لكل الأدوار */}
         <Route element={<DashboardLayout />}>
           
           {/* مسارات المدير */}
@@ -44,21 +45,22 @@ export const AppRoutes = () => {
             <Route path="/admin/activities" element={<ManageActivities />} />
           </Route>
 
-          {/* مسارات المشرف */}
+          {/* مسارات المشرف (التي تظهر فقط للمشرفين) */}
           <Route element={<ProtectedRoute allowedRoles={['supervisor']} />}>
             <Route path="/supervisor/dashboard" element={<SupervisorDashboard />} />
             <Route path="/supervisor/applicants" element={<Applicants />} />
           </Route>
 
-          {/* مسارات المتطوع */}
+          {/* مسارات المتطوع (تشمل وظائف المشرف إذا كان متطوعاً) */}
           <Route element={<ProtectedRoute allowedRoles={['volunteer']} />}>
             <Route path="/volunteer/dashboard" element={<VolunteerDashboard />} />
-            <Route path="/volunteer/sessions" element={<AvailableSessions />} />
+            <Route path="/volunteer/sessions" element={<AvailableSessions />} /> 
+            <Route path="/volunteer/my-schedule" element={<MySchedule />} />
+            <Route path="/volunteer/hours" element={<VolunteerHours />} />
           </Route>
 
         </Route>
 
-        {/* التوجيه الافتراضي */}
         <Route path="*" element={
           !user ? <Navigate to="/login" /> :
           user.role === 'admin' ? <Navigate to="/admin/dashboard" /> :

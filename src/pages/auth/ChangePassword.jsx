@@ -1,16 +1,22 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Lock, ArrowLeft, Loader2, Eye, EyeOff } from 'lucide-react';
+import axiosClient from '../../api/axiosClient';
+import { useAuth } from '../../context/AuthContext';
 
 export default function ChangePassword() {
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [showPasswords, setShowPasswords] = useState(false);
+  
+  const [showCurrent, setShowCurrent] = useState(false);
+  const [showNew, setShowNew] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [isSuccess, setIsSuccess] = useState(false);
   
+  const { user, fetchUser, logout } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
@@ -22,19 +28,30 @@ export default function ChangePassword() {
     }
 
     setIsLoading(true);
-    // محاكاة إرسال الطلب (للتجربة فقط)
-    setTimeout(() => {
+    try {
+      await axiosClient.post('/change-password', {
+        current_password: currentPassword,
+        new_password: newPassword,
+        new_password_confirmation: confirmPassword,
+      });
+
+      await fetchUser();
+      
+      if (user.role === 'admin') navigate('/admin/dashboard');
+      else if (user.role === 'supervisor') navigate('/supervisor/dashboard');
+      else navigate('/volunteer/dashboard');
+
+    } catch (err) {
+      setError(err.response?.data?.message || 'حدث خطأ أثناء تغيير كلمة المرور');
+    } finally {
       setIsLoading(false);
-      setIsSuccess(true);
-      setTimeout(() => {
-        navigate('/login'); // العودة لتسجيل الدخول بعد التجربة
-      }, 2000);
-    }, 1000);
+    }
   };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-surface p-4">
       <div className="w-full max-w-md bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
+        
         <div className="text-center mb-8">
           <div className="w-16 h-16 bg-brand-50 text-brand-500 rounded-full flex items-center justify-center mx-auto mb-4">
             <Lock className="w-8 h-8" />
@@ -49,78 +66,73 @@ export default function ChangePassword() {
           </div>
         )}
 
-        {isSuccess && (
-          <div className="bg-green-50 text-green-600 p-3 rounded-xl text-sm text-center mb-6 border border-green-100">
-            تم تغيير كلمة المرور بنجاح! (وضع التجربة)
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* كلمة المرور الحالية */}
+        <form onSubmit={handleSubmit} className="space-y-5">
+          
+          {/* 1. كلمة المرور الحالية */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">كلمة المرور الحالية</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">كلمة المرور الحالية</label>
             <div className="relative">
               <input 
-                type={showPasswords ? "text" : "password"} 
+                type={showCurrent ? "text" : "password"} 
                 required 
                 value={currentPassword} 
                 onChange={(e) => setCurrentPassword(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all text-left" 
+                placeholder="••••••••" 
+                className="w-full h-12 pl-10 pr-4 rounded-xl border border-gray-300 bg-white text-gray-800 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all text-left" 
                 dir="ltr"
-                placeholder="••••••••"
               />
               <button 
                 type="button" 
-                onClick={() => setShowPasswords(!showPasswords)}
+                onClick={() => setShowCurrent(!showCurrent)}
                 className="absolute left-3 top-3.5 text-gray-400 hover:text-gray-600"
               >
-                {showPasswords ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                {showCurrent ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
               </button>
             </div>
           </div>
 
-          {/* كلمة المرور الجديدة */}
+          {/* 2. كلمة المرور الجديدة */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">كلمة المرور الجديدة</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">كلمة المرور الجديدة</label>
             <div className="relative">
               <input 
-                type={showPasswords ? "text" : "password"} 
+                type={showNew ? "text" : "password"} 
                 required 
                 value={newPassword} 
                 onChange={(e) => setNewPassword(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all text-left" 
+                placeholder="••••••••" 
+                className="w-full h-12 pl-10 pr-4 rounded-xl border border-gray-300 bg-white text-gray-800 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all text-left" 
                 dir="ltr"
-                placeholder="••••••••"
               />
               <button 
                 type="button" 
-                onClick={() => setShowPasswords(!showPasswords)}
+                onClick={() => setShowNew(!showNew)}
                 className="absolute left-3 top-3.5 text-gray-400 hover:text-gray-600"
               >
-                {showPasswords ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                {showNew ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
               </button>
             </div>
           </div>
 
-          {/* تأكيد كلمة المرور الجديدة */}
+          {/* 3. تأكيد كلمة المرور الجديدة */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">تأكيد كلمة المرور الجديدة</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">تأكيد كلمة المرور الجديدة</label>
             <div className="relative">
               <input 
-                type={showPasswords ? "text" : "password"} 
+                type={showConfirm ? "text" : "password"} 
                 required 
                 value={confirmPassword} 
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all text-left" 
+                placeholder="••••••••" 
+                className="w-full h-12 pl-10 pr-4 rounded-xl border border-gray-300 bg-white text-gray-800 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all text-left" 
                 dir="ltr"
-                placeholder="••••••••"
               />
               <button 
                 type="button" 
-                onClick={() => setShowPasswords(!showPasswords)}
+                onClick={() => setShowConfirm(!showConfirm)}
                 className="absolute left-3 top-3.5 text-gray-400 hover:text-gray-600"
               >
-                {showPasswords ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                {showConfirm ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
               </button>
             </div>
           </div>
@@ -132,6 +144,10 @@ export default function ChangePassword() {
             )}
           </button>
         </form>
+
+        <button onClick={logout} className="w-full text-center text-gray-500 text-sm mt-6 hover:text-gray-800 transition-colors">
+          العودة لتسجيل الدخول
+        </button>
       </div>
     </div>
   );
