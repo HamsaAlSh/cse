@@ -2,13 +2,13 @@ import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { 
   LayoutDashboard, Users, CalendarDays, Clock, 
-  UserCheck, X, Lock, Eye, EyeOff, Loader2, Mail, Phone, Briefcase, LogOut
+  UserCheck, X, Lock, Eye, EyeOff, Loader2, Mail, Phone, Briefcase
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import axiosClient from '../../api/axiosClient';
 
 export default function Sidebar({ isOpen, onClose }) {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [userInfo, setUserInfo] = useState(null);
@@ -114,7 +114,8 @@ export default function Sidebar({ isOpen, onClose }) {
           ))}
         </nav>
 
-        <div className="p-4 border-t border-gray-100 space-y-3">
+        {/* قسم معلومات المستخدم فقط (تم حذف زر تسجيل الخروج) */}
+        <div className="p-4 border-t border-gray-100">
           <button onClick={handleOpenProfile} className="w-full flex items-center gap-3 p-2 rounded-xl hover:bg-gray-50 transition-colors text-right">
             <div className="w-10 h-10 rounded-full bg-brand-100 text-brand-600 flex items-center justify-center font-bold text-lg shrink-0">
               {user?.name?.charAt(0)}
@@ -123,14 +124,6 @@ export default function Sidebar({ isOpen, onClose }) {
               <p className="font-bold text-gray-800 truncate">{user?.name}</p>
               <p className="text-xs text-gray-500">{user?.role === 'admin' ? 'مدير النظام' : user?.role === 'supervisor' ? 'مشرف' : 'متطوع'}</p>
             </div>
-          </button>
-
-          <button 
-            onClick={logout} 
-            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-red-50 text-red-600 hover:bg-red-100 rounded-xl transition-colors font-medium text-sm"
-          >
-            <LogOut className="w-4 h-4" />
-            تسجيل الخروج
           </button>
         </div>
       </aside>
