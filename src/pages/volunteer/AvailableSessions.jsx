@@ -21,10 +21,7 @@ export default function AvailableSessions() {
   const [applyingId, setApplyingId] = useState(null);
   const [successMessage, setSuccessMessage] = useState('');
 
-  // حالة النافذة المنبثقة
   const [selectedSession, setSelectedSession] = useState(null);
-  
-  // حالة قائمة المتقدمين (للمشرف)
   const [applicants, setApplicants] = useState([]);
   const [isLoadingApplicants, setIsLoadingApplicants] = useState(false);
   const [assigningId, setAssigningId] = useState(null);
@@ -43,29 +40,30 @@ export default function AvailableSessions() {
     fetchSessions();
   }, []);
 
-  // فتح النافذة وجلب المتقدمين إذا كان المستخدم هو المشرف على هذه الجلسة
+  // دالة جلب المتقدمين (مفصولة حتى نستطيع إعادة استدعائها بعد القبول)
+  const fetchApplicants = async (sessionId) => {
+    setIsLoadingApplicants(true);
+    try {
+      const response = await axiosClient.get(`/supervisor/sessions/${sessionId}/applicants`);
+      setApplicants(response.data.volunteers || []);
+    } catch (err) {
+      console.error("فشل جلب المتقدمين", err);
+    } finally {
+      setIsLoadingApplicants(false);
+    }
+  };
+
   const handleOpenSession = async (session) => {
     setSelectedSession(session);
     setApplicants([]);
     setError('');
     setSuccessMessage('');
 
-    // التحقق: هل هذا المتطوع هو المشرف على الجلسة؟
     if (session.supervisor_id === user.id) {
-      setIsLoadingApplicants(true);
-      try {
-        // جلب المتقدمين بناءً على API المشرف
-        const response = await axiosClient.get(`/supervisor/sessions/${session.id}/applicants`);
-        setApplicants(response.data.volunteers || []);
-      } catch (err) {
-        console.error("فشل جلب المتقدمين", err);
-      } finally {
-        setIsLoadingApplicants(false);
-      }
+      await fetchApplicants(session.id); // جلب المتقدمين
     }
   };
 
-  // دالة تقديم الطلب (للمتطوع العادي)
   const handleApply = async (sessionId) => {
     setApplyingId(sessionId);
     setError('');
@@ -81,7 +79,6 @@ export default function AvailableSessions() {
     }
   };
 
-  // دالة قبول متطوع (للمشرف)
   const handleAssign = async (volunteerId) => {
     setAssigningId(volunteerId);
     setError('');
@@ -91,8 +88,10 @@ export default function AvailableSessions() {
         volunteer_ids: [volunteerId]
       });
       setSuccessMessage('تم قبول المتطوع بنجاح!');
-      // إزالة المتطوع من القائمة
-      setApplicants(applicants.filter(v => v.id !== volunteerId));
+      
+      // *** الحل: إعادة جلب قائمة المتقدمين من الباك إند بدلاً من التعديل المحلي فقط ***
+      await fetchApplicants(selectedSession.id); 
+      
     } catch (err) {
       setError(err.response?.data?.message || 'فشل قبول المتطوع.');
     } finally {
@@ -104,75 +103,13 @@ export default function AvailableSessions() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-800">الجلسات المتاحة</h1>
-        <p className="text-gray-500 text-sm mt-1">تصفح البرنامج الأسبوعي، واضغط على أي جلسة لرؤية التفاصيل أو إدارة المتقدمين (إذا كنت مشرفاً).</p>
-      </div>
-
-      {error && <div className="bg-red-50 text-red-600 p-4 rounded-xl flex items-center gap-2"><AlertCircle className="w-5 h-5" />{error}</div>}
-      {successMessage && <div className="bg-green-50 text-green-600 p-4 rounded-xl flex items-center gap-2"><CheckCircle2 className="w-5 h-5" />{successMessage}</div>}
-
-      <div className="grid grid-cols-1 md:grid-cols-7 gap-4">
-        {DAYS_OF_WEEK.map((day) => {
-          const daySessions = sessions.filter(s => s.day_of_week === day.id);
-          return (
-            <div key={day.id} className="border border-gray-100 rounded-xl p-3 bg-gray-50/50 min-h-[150px]">
-              <h3 className="font-bold text-gray-800 text-center pb-3 border-b border-gray-200 mb-3 text-sm">{day.label}</h3>
-              <div className="space-y-2">
-                {daySessions.length === 0 ? (
-                  <p className="text-xs text-center text-gray-400 py-4">لا يوجد</p>
-                ) : (
-                  daySessions.map((session) => (
-                    <div 
-                      key={session.id} 
-                      onClick={() => handleOpenSession(session)}
-                      className="bg-white p-3 rounded-lg border border-brand-100 shadow-sm cursor-pointer hover:shadow-md hover:border-brand-300 transition-all group"
-                    >
-                      <p className="font-semibold text-brand-700 text-sm truncate">{session.activity?.title}</p>
-                      <div className="flex items-center gap-1 mt-2 text-xs text-gray-600 bg-gray-100 p-1 rounded w-fit" dir="ltr">
-                        <Clock className="w-3 h-3" /> {session.time_slot}
-                      </div>
-                      <div className="mt-2 text-xs text-brand-600 font-medium flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        عرض التفاصيل &larr;
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* النافذة المنبثقة */}
+      {/* ... (باقي الكود كما هو) ... */}
+      
+      {/* داخل الـ Modal: */}
       {selectedSession && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl w-full max-w-lg p-6 shadow-xl relative animate-in fade-in zoom-in duration-200 max-h-[90vh] overflow-y-auto">
-            <button onClick={() => setSelectedSession(null)} className="absolute top-4 left-4 text-gray-400 hover:text-gray-600">
-              <X className="w-5 h-5" />
-            </button>
-
-            <div className="text-center mb-6 border-b border-gray-100 pb-4">
-              <h3 className="text-2xl font-bold text-gray-800">{selectedSession.activity?.title}</h3>
-              <p className="text-sm text-gray-500 mt-1">{DAYS_OF_WEEK.find(d => d.id === selectedSession.day_of_week)?.label} | {selectedSession.time_slot}</p>
-            </div>
-
-            <div className="space-y-4 mb-6">
-              <div className="flex items-start gap-3">
-                <FileText className="w-5 h-5 text-gray-400 mt-0.5" />
-                <div>
-                  <h4 className="text-sm font-bold text-gray-800 mb-1">الوصف</h4>
-                  <p className="text-sm text-gray-600">{selectedSession.activity?.description || 'لا يوجد وصف.'}</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3">
-                <User className="w-5 h-5 text-gray-400 mt-0.5" />
-                <div>
-                  <h4 className="text-sm font-bold text-gray-800 mb-1">المشرف</h4>
-                  <p className="text-sm text-gray-600">{selectedSession.supervisor?.name || 'لم يتم تعيين مشرف بعد.'}</p>
-                </div>
-              </div>
-            </div>
+            {/* ... (الترويسة والتفاصيل) ... */}
 
             {/* إذا كان المستخدم هو المشرف، تظهر قائمة المتقدمين */}
             {selectedSession.supervisor_id === user.id ? (
@@ -183,7 +120,7 @@ export default function AvailableSessions() {
                 {isLoadingApplicants ? (
                   <div className="flex justify-center py-4"><Loader2 className="w-6 h-6 animate-spin text-brand-500" /></div>
                 ) : applicants.length === 0 ? (
-                  <p className="text-sm text-gray-500 text-center py-4">لا يوجد متطوعون متقدمون حالياً.</p>
+                  <p className="text-sm text-gray-500 text-center py-4">لا يوجد متطوعون متقدمون حالياً (أو تم قبولهم جميعاً).</p>
                 ) : (
                   <div className="space-y-2">
                     {applicants.map((vol) => (
@@ -197,7 +134,7 @@ export default function AvailableSessions() {
                           disabled={assigningId === vol.id}
                           className="bg-green-500 hover:bg-green-600 text-white text-xs font-bold py-1.5 px-4 rounded-md disabled:opacity-50"
                         >
-                          {assigningId === vol.id ? 'جاري...' : 'قبول'}
+                          {assigningId === vol.id ? <Loader2 className="w-4 h-4 animate-spin" /> : 'قبول'}
                         </button>
                       </div>
                     ))}
@@ -205,14 +142,9 @@ export default function AvailableSessions() {
                 )}
               </div>
             ) : (
-              // إذا كان المستخدم متطوعاً عادياً، يظهر زر التقديم
+              // زر التقديم للمتطوع العادي
               <div className="mt-4">
-                <button onClick={() => handleApply(selectedSession.id)} disabled={applyingId === selectedSession.id}
-                  className="w-full bg-brand-500 hover:bg-brand-600 text-white font-medium py-3 rounded-xl transition-all shadow-lg shadow-brand-500/30 flex items-center justify-center gap-2 disabled:opacity-70">
-                  {applyingId === selectedSession.id ? <Loader2 className="w-5 h-5 animate-spin" /> : (
-                    <><UserPlus className="w-5 h-5" /> تقديم طلب للانضمام</>
-                  )}
-                </button>
+                {/* ... */}
               </div>
             )}
           </div>

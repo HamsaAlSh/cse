@@ -1,14 +1,14 @@
 import { createContext, useState, useEffect, useContext } from 'react';
 import axiosClient from '../api/axiosClient';
+import { Loader2 } from 'lucide-react'; // استيراد أيقونة التحميل
 
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(localStorage.getItem('access_token') || null);
-  const [isLoading, setIsLoading] = useState(true); // نبدأ بـ true حتى يتم التحقق
+  const [isLoading, setIsLoading] = useState(true); // نبدأ بـ true للتحقق الأولي
 
-  // جلب بيانات المستخدم إذا كان التوكن موجوداً (عند فتح الصفحة أو الريفريش)
   useEffect(() => {
     const fetchUser = async () => {
       if (token) {
@@ -16,13 +16,12 @@ export const AuthProvider = ({ children }) => {
           const response = await axiosClient.get('/user');
           setUser(response.data.user);
         } catch (error) {
-          // إذا كان التوكن غير صالح، قم بتسجيل الخروج
           localStorage.removeItem('access_token');
           setToken(null);
           setUser(null);
         }
       }
-      setIsLoading(false); // انتهينا من التحقق
+      setIsLoading(false); // انتهى التحقق
     };
     fetchUser();
   }, [token]);
@@ -59,9 +58,18 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // إذا كان التطبيق في حالة تحميل (التحقق الأولي من التوكن)، نعرض شاشة تحميل صغيرة
+  if (isLoading && !user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-surface">
+        <Loader2 className="w-8 h-8 animate-spin text-brand-500" />
+      </div>
+    );
+  }
+
   return (
     <AuthContext.Provider value={{ user, token, isLoading, login, logout, fetchUser }}>
-      {!isLoading && children} {/* لا تعرض التطبيق حتى ينتهي التحقق */}
+      {children}
     </AuthContext.Provider>
   );
 };
