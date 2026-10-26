@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import axiosClient from '../../api/axiosClient';
 import { 
   CalendarDays, Clock, Loader2, AlertCircle, CheckCircle2, 
-  User, X, FileText, UserPlus, UserCheck, Phone, Hourglass
+  User, X, FileText, UserPlus, UserCheck, Phone, Hourglass 
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
@@ -23,25 +23,47 @@ export default function AvailableSessions() {
 
   const [selectedSession, setSelectedSession] = useState(null);
   
-  // قائمة المتقدمين (للمشرف)
   const [applicants, setApplicants] = useState([]);
   const [isLoadingApplicants, setIsLoadingApplicants] = useState(false);
   const [assigningId, setAssigningId] = useState(null);
 
-  // جلب الجلسات
-  const fetchSessions = async () => {
+  // دالة لجلب كلا البيانات (الجدول والجلسات) ودمج الحالة
+  const fetchData = async () => {
     try {
-      const response = await axiosClient.get('/volunteer/sessions');
-      setSessions(response.data.sessions || []);
+      // 1. جلب الجلسات المتاحة
+      const sessionsRes = await axiosClient.get('/volunteer/sessions');
+      const availableSessions = sessionsRes.data.sessions || [];
+
+      // 2. جلب جدول المتطوع (الذي يحتوي على حالة الطلب)
+      const scheduleRes = await axiosClient.get('/volunteer/schedule');
+      const mySchedule = scheduleRes.data.schedule || [];
+
+      // 3. إنشاء خريطة (Map) لحالة الطلب لكل جلسة
+      const statusMap = {};
+      mySchedule.forEach(item => {
+        // نفترض أن item.id هو نفس session_id
+        statusMap[item.id] = item.pivot?.status; 
+      });
+
+      // 4. دمج حالة الطلب مع الجلسات المتاحة
+      const mergedSessions = availableSessions.map(session => ({
+        ...session,
+        // إذا كانت الجلسة موجودة في الجدول، نأخذ حالتها. وإلا لا توجد حالة.
+        my_application_status: statusMap[session.id] || null 
+      }));
+
+      setSessions(mergedSessions);
+
     } catch (err) {
-      setError('فشل جلب الجلسات المتاحة.');
+      console.error("خطأ في جلب البيانات:", err);
+      setError('فشل جلب البيانات. تأكد من الاتصال بالباك إند.');
     } finally {
       setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchSessions();
+    fetchData();
   }, []);
 
   // جلب المتقدمين (للمشرف)
@@ -58,30 +80,33 @@ export default function AvailableSessions() {
   };
 
   const handleOpenSession = async (session) => {
-    setSelectedSession(session);
+    // استخدام النسخة المحدثة من الجلسة
+    const currentSession = sessions.find(s => s.id === session.id) || session;
+    setSelectedSession(currentSession);
     setApplicants([]);
     setError('');
     setSuccessMessage('');
 
-    if (session.supervisor_id === user.id) {
-      await fetchApplicants(session.id);
+    if (currentSession.supervisor_id === user.id) {
+      await fetchApplicants(currentSession.id);
     }
   };
 
-  // دالة تقديم الطلب (للمتطوع)
+  // دالة تقديم الطلب
   const handleApply = async (sessionId) => {
     setApplyingId(sessionId);
     setError('');
     setSuccessMessage('');
     try {
       await axiosClient.post(`/volunteer/sessions/${sessionId}/apply`);
+      
       setSuccessMessage('تم تقديم طلبك بنجاح! بانتظار موافقة المشرف.');
       
-      // إعادة جلب الجلسات لتحديث الحالة إلى pending
-      await fetchSessions();
+      // إعادة جلب البيانات (الجدول + الجلسات) لتحديث الحالة في الواجهة
+      await fetchData();
       
-      const updatedSession = sessions.find(s => s.id === sessionId);
-      if (updatedSession) setSelectedSession(updatedSession);
+      // إغلاق النافذة بعد ثانيتين
+      setTimeout(() => setSelectedSession(null), 2000);
 
     } catch (err) {
       setError(err.response?.data?.message || 'فشل تقديم الطلب.');
@@ -96,14 +121,11 @@ export default function AvailableSessions() {
     setError('');
     setSuccessMessage('');
     try {
-      // إرسال طلب القبول باستخدام الـ API الموجود في Postman
       await axiosClient.post(`/sessions/${selectedSession.id}/assign-volunteers`, {
         volunteer_ids: [volunteerId]
       });
-      
       setSuccessMessage('تم قبول المتطوع بنجاح!');
       
-      // إعادة جلب قائمة المتقدمين من الباك إند لتحديث القائمة
       await fetchApplicants(selectedSession.id); 
       
     } catch (err) {
@@ -119,7 +141,7 @@ export default function AvailableSessions() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-800">الجلسات المتاحة</h1>
-        <p className="text-gray-500 text-sm mt-1">تصفح البرنامج الأسبوعي، وقدم طلباً للانضمام، أو قم بإدارة المتقدمين (إذا كنت مشرفاً).</p>
+        <p className="text-gray-500 text-sm mt-1">تصفح البرنامج الأسبوعي، واضغط على أي جلسة للانضمام أو إدارة المتقدمين.</p>
       </div>
 
       {error && <div className="bg-red-50 text-red-600 p-4 rounded-xl flex items-center gap-2"><AlertCircle className="w-5 h-5" />{error}</div>}
@@ -136,8 +158,8 @@ export default function AvailableSessions() {
                   <p className="text-xs text-center text-gray-400 py-4">لا يوجد</p>
                 ) : (
                   daySessions.map((session) => {
-                    // حالة الطلب من الباك إند (pivot.status)
-                    const status = session.pivot?.status;
+                    // استخدام الحالة المدمجة
+                    const status = session.my_application_status;
                     
                     return (
                       <div 
@@ -206,12 +228,12 @@ export default function AvailableSessions() {
             {/* واجهة المتطوع */}
             {selectedSession.supervisor_id !== user.id && (
               <div className="mt-4">
-                {selectedSession.pivot?.status === 'pending' ? (
+                {selectedSession.my_application_status === 'pending' ? (
                   <div className="bg-amber-50 text-amber-700 border border-amber-200 p-4 rounded-xl flex items-center justify-center gap-2 font-medium">
                     <Hourglass className="w-5 h-5 animate-pulse" />
                     طلبك قيد الانتظار. بانتظار موافقة المشرف.
                   </div>
-                ) : selectedSession.pivot?.status === 'assigned' ? (
+                ) : selectedSession.my_application_status === 'assigned' ? (
                   <div className="bg-green-50 text-green-700 border border-green-200 p-4 rounded-xl flex items-center justify-center gap-2 font-medium">
                     <CheckCircle2 className="w-5 h-5" />
                     تم قبولك في هذه الجلسة!
@@ -253,7 +275,6 @@ export default function AvailableSessions() {
                             </div>
                           </div>
                           
-                          {/* زر القبول (يظهر فقط إذا كانت الحالة pending) */}
                           {vol.pivot?.status === 'pending' ? (
                             <button 
                               onClick={() => handleAssign(vol.id)} 
@@ -266,7 +287,6 @@ export default function AvailableSessions() {
                             <span className="text-xs text-green-600 font-bold bg-green-50 px-2 py-1 rounded">مقبول</span>
                           )}
                         </div>
-                        {/* عرض ساعات المتطوع */}
                         <div className="text-xs text-gray-500 flex justify-between">
                           <span>الساعات: {vol.total_hours || 0}</span>
                           {vol.pivot?.status && <span>الحالة: {vol.pivot.status === 'pending' ? 'قيد الانتظار' : 'مقبول'}</span>}
