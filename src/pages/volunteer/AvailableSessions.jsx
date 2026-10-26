@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import axiosClient from '../../api/axiosClient';
 import { 
   CalendarDays, Clock, Loader2, AlertCircle, CheckCircle2, 
-  User, X, FileText, UserPlus, UserCheck, Phone, Hourglass 
+  User, X, FileText, UserPlus, UserCheck, Hourglass 
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
@@ -25,30 +25,26 @@ export default function AvailableSessions() {
   
   const [applicants, setApplicants] = useState([]);
   const [isLoadingApplicants, setIsLoadingApplicants] = useState(false);
-  const [assigningId, setAssigningId] = useState(null);
+  
+  const [selectedVolunteerIds, setSelectedVolunteerIds] = useState([]);
+  const [isAssigning, setIsAssigning] = useState(false);
 
-  // دالة لجلب كلا البيانات (الجدول والجلسات) ودمج الحالة
+  // جلب البيانات ودمج حالة الطلب
   const fetchData = async () => {
     try {
-      // 1. جلب الجلسات المتاحة
       const sessionsRes = await axiosClient.get('/volunteer/sessions');
       const availableSessions = sessionsRes.data.sessions || [];
 
-      // 2. جلب جدول المتطوع (الذي يحتوي على حالة الطلب)
       const scheduleRes = await axiosClient.get('/volunteer/schedule');
       const mySchedule = scheduleRes.data.schedule || [];
 
-      // 3. إنشاء خريطة (Map) لحالة الطلب لكل جلسة
       const statusMap = {};
       mySchedule.forEach(item => {
-        // نفترض أن item.id هو نفس session_id
         statusMap[item.id] = item.pivot?.status; 
       });
 
-      // 4. دمج حالة الطلب مع الجلسات المتاحة
       const mergedSessions = availableSessions.map(session => ({
         ...session,
-        // إذا كانت الجلسة موجودة في الجدول، نأخذ حالتها. وإلا لا توجد حالة.
         my_application_status: statusMap[session.id] || null 
       }));
 
@@ -56,7 +52,7 @@ export default function AvailableSessions() {
 
     } catch (err) {
       console.error("خطأ في جلب البيانات:", err);
-      setError('فشل جلب البيانات. تأكد من الاتصال بالباك إند.');
+      setError('فشل جلب البيانات.');
     } finally {
       setIsLoading(false);
     }
@@ -72,6 +68,7 @@ export default function AvailableSessions() {
     try {
       const response = await axiosClient.get(`/supervisor/sessions/${sessionId}/applicants`);
       setApplicants(response.data.volunteers || []);
+      setSelectedVolunteerIds([]);
     } catch (err) {
       console.error("فشل جلب المتقدمين", err);
     } finally {
@@ -79,35 +76,31 @@ export default function AvailableSessions() {
     }
   };
 
+  // *** التعديل: جلب المتقدمين فقط إذا كان المستخدم هو المشرف على هذه الجلسة ***
   const handleOpenSession = async (session) => {
-    // استخدام النسخة المحدثة من الجلسة
     const currentSession = sessions.find(s => s.id === session.id) || session;
     setSelectedSession(currentSession);
     setApplicants([]);
+    setSelectedVolunteerIds([]);
     setError('');
     setSuccessMessage('');
 
+    // التحقق من أن المستخدم هو المشرف المسؤول عن الجلسة
     if (currentSession.supervisor_id === user.id) {
       await fetchApplicants(currentSession.id);
     }
   };
 
-  // دالة تقديم الطلب
+  // دالة تقديم الطلب (للمتطوع)
   const handleApply = async (sessionId) => {
     setApplyingId(sessionId);
     setError('');
     setSuccessMessage('');
     try {
       await axiosClient.post(`/volunteer/sessions/${sessionId}/apply`);
-      
       setSuccessMessage('تم تقديم طلبك بنجاح! بانتظار موافقة المشرف.');
-      
-      // إعادة جلب البيانات (الجدول + الجلسات) لتحديث الحالة في الواجهة
       await fetchData();
-      
-      // إغلاق النافذة بعد ثانيتين
       setTimeout(() => setSelectedSession(null), 2000);
-
     } catch (err) {
       setError(err.response?.data?.message || 'فشل تقديم الطلب.');
     } finally {
@@ -115,23 +108,32 @@ export default function AvailableSessions() {
     }
   };
 
-  // دالة قبول المتطوع (للمشرف)
-  const handleAssign = async (volunteerId) => {
-    setAssigningId(volunteerId);
+  // دالة قبول المتطوعين (للمشرف)
+  const handleAssign = async () => {
+    if (selectedVolunteerIds.length === 0) {
+      return setError('الرجاء اختيار متطوع واحد على الأقل.');
+    }
+    
+    setIsAssigning(true);
     setError('');
     setSuccessMessage('');
     try {
       await axiosClient.post(`/sessions/${selectedSession.id}/assign-volunteers`, {
-        volunteer_ids: [volunteerId]
+        volunteer_ids: selectedVolunteerIds
       });
-      setSuccessMessage('تم قبول المتطوع بنجاح!');
       
-      await fetchApplicants(selectedSession.id); 
+      setSuccessMessage('تم قبول المتطوعين بنجاح!');
       
+      const remainingApplicants = applicants.filter(
+        (vol) => !selectedVolunteerIds.includes(vol.id)
+      );
+      setApplicants(remainingApplicants);
+      setSelectedVolunteerIds([]);
+
     } catch (err) {
-      setError(err.response?.data?.message || 'فشل قبول المتطوع.');
+      setError(err.response?.data?.message || 'فشل قبول المتطوعين.');
     } finally {
-      setAssigningId(null);
+      setIsAssigning(false);
     }
   };
 
@@ -158,27 +160,19 @@ export default function AvailableSessions() {
                   <p className="text-xs text-center text-gray-400 py-4">لا يوجد</p>
                 ) : (
                   daySessions.map((session) => {
-                    // استخدام الحالة المدمجة
                     const status = session.my_application_status;
-                    
                     return (
                       <div 
                         key={session.id} 
                         onClick={() => handleOpenSession(session)}
                         className="bg-white p-3 rounded-lg border border-brand-100 shadow-sm cursor-pointer hover:shadow-md hover:border-brand-300 transition-all group relative overflow-hidden"
                       >
-                        {/* شارة الحالة */}
                         {status === 'pending' && (
-                          <div className="absolute top-0 left-0 bg-amber-100 text-amber-700 text-[10px] font-bold px-2 py-0.5 rounded-br-lg">
-                            قيد الانتظار
-                          </div>
+                          <div className="absolute top-0 left-0 bg-amber-100 text-amber-700 text-[10px] font-bold px-2 py-0.5 rounded-br-lg">قيد الانتظار</div>
                         )}
                         {status === 'assigned' && (
-                          <div className="absolute top-0 left-0 bg-green-100 text-green-700 text-[10px] font-bold px-2 py-0.5 rounded-br-lg">
-                            مقبول
-                          </div>
+                          <div className="absolute top-0 left-0 bg-green-100 text-green-700 text-[10px] font-bold px-2 py-0.5 rounded-br-lg">مقبول</div>
                         )}
-
                         <p className="font-semibold text-brand-700 text-sm truncate mt-1">{session.activity?.title}</p>
                         <div className="flex items-center gap-1 mt-2 text-xs text-gray-600 bg-gray-100 p-1 rounded w-fit" dir="ltr">
                           <Clock className="w-3 h-3" /> {session.time_slot}
@@ -225,7 +219,7 @@ export default function AvailableSessions() {
               </div>
             </div>
 
-            {/* واجهة المتطوع */}
+            {/* واجهة المتطوع (إذا لم يكن هو المشرف على هذه الجلسة) */}
             {selectedSession.supervisor_id !== user.id && (
               <div className="mt-4">
                 {selectedSession.my_application_status === 'pending' ? (
@@ -252,7 +246,7 @@ export default function AvailableSessions() {
               </div>
             )}
 
-            {/* واجهة المشرف */}
+            {/* واجهة المشرف (فقط إذا كان هو المشرف على هذه الجلسة) */}
             {selectedSession.supervisor_id === user.id && (
               <div className="border-t border-gray-100 pt-4">
                 <h4 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
@@ -263,36 +257,45 @@ export default function AvailableSessions() {
                 ) : applicants.length === 0 ? (
                   <p className="text-sm text-gray-500 text-center py-4">لا يوجد متطوعون متقدمون حالياً.</p>
                 ) : (
-                  <div className="space-y-2">
-                    {applicants.map((vol) => (
-                      <div key={vol.id} className="flex flex-col p-3 bg-gray-50 rounded-lg gap-2">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-brand-100 text-brand-600 flex items-center justify-center text-sm font-bold">{vol.name.charAt(0)}</div>
-                            <div>
-                              <p className="text-sm font-bold text-gray-800">{vol.name}</p>
-                              <p className="text-xs text-gray-500" dir="ltr">{vol.phone || 'رقم غير متوفر'}</p>
+                  <div className="space-y-4">
+                    <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">اختر المتطوعين لقبولهم</label>
+                      <div className="space-y-2 max-h-40 overflow-y-auto">
+                        {applicants.map((vol) => (
+                          <label key={vol.id} className="flex items-center gap-3 p-2 hover:bg-white rounded-lg cursor-pointer transition-colors">
+                            <input 
+                              type="checkbox" 
+                              checked={selectedVolunteerIds.includes(vol.id)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedVolunteerIds([...selectedVolunteerIds, vol.id]);
+                                } else {
+                                  setSelectedVolunteerIds(selectedVolunteerIds.filter(id => id !== vol.id));
+                                }
+                              }}
+                              className="w-4 h-4 text-brand-500 rounded border-gray-300"
+                            />
+                            <div className="flex-1 flex justify-between items-center">
+                              <div>
+                                <p className="text-sm font-bold text-gray-800">{vol.name}</p>
+                              </div>
+                              <div className="text-xs text-brand-600 font-medium bg-brand-50 px-2 py-1 rounded">
+                                {vol.total_hours || 0} ساعة
+                              </div>
                             </div>
-                          </div>
-                          
-                          {vol.pivot?.status === 'pending' ? (
-                            <button 
-                              onClick={() => handleAssign(vol.id)} 
-                              disabled={assigningId === vol.id}
-                              className="bg-green-500 hover:bg-green-600 text-white text-xs font-bold py-1.5 px-4 rounded-md disabled:opacity-50"
-                            >
-                              {assigningId === vol.id ? <Loader2 className="w-4 h-4 animate-spin" /> : 'قبول'}
-                            </button>
-                          ) : (
-                            <span className="text-xs text-green-600 font-bold bg-green-50 px-2 py-1 rounded">مقبول</span>
-                          )}
-                        </div>
-                        <div className="text-xs text-gray-500 flex justify-between">
-                          <span>الساعات: {vol.total_hours || 0}</span>
-                          {vol.pivot?.status && <span>الحالة: {vol.pivot.status === 'pending' ? 'قيد الانتظار' : 'مقبول'}</span>}
-                        </div>
+                          </label>
+                        ))}
                       </div>
-                    ))}
+                    </div>
+                    <button 
+                      onClick={handleAssign}
+                      disabled={isAssigning || selectedVolunteerIds.length === 0}
+                      className="w-full bg-green-500 hover:bg-green-600 text-white font-medium py-3 rounded-xl transition-all shadow-lg shadow-green-500/30 flex items-center justify-center gap-2 disabled:opacity-50"
+                    >
+                      {isAssigning ? <Loader2 className="w-5 h-5 animate-spin" /> : (
+                        <><UserCheck className="w-5 h-5" /> تأكيد تعيين {selectedVolunteerIds.length} متطوع</>
+                      )}
+                    </button>
                   </div>
                 )}
               </div>

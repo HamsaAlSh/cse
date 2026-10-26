@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import axiosClient from '../../api/axiosClient';
 import { 
   Plus, CalendarDays, Clock, CheckCircle2, AlertCircle, 
-  Loader2, BookOpen, UserCog, User, X 
+  Loader2, BookOpen, UserCog, User, X, Edit, Save, FileText
 } from 'lucide-react';
 
 const DAYS_OF_WEEK = [
@@ -25,10 +25,17 @@ export default function ManageActivities() {
   const [isFetching, setIsFetching] = useState(true);
   const [message, setMessage] = useState({ type: '', text: '' });
 
-  // حالة النافذة المنبثقة لعرض التفاصيل
+  // حالة نافذة التفاصيل
   const [selectedActivity, setSelectedActivity] = useState(null);
+  
+  // حالة نافذة التعديل
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingActivity, setEditingActivity] = useState(null);
+  const [editFormData, setEditFormData] = useState({
+    title: '', description: '', time_slot: '', day_of_week: '', supervisor_id: ''
+  });
+  const [isUpdating, setIsUpdating] = useState(false);
 
-  // دالة جلب الجلسات من الباك إند
   const fetchActivities = async () => {
     try {
       const response = await axiosClient.get('/volunteer/sessions'); 
@@ -40,7 +47,6 @@ export default function ManageActivities() {
     }
   };
 
-  // دالة جلب المتطوعين (لتعيين مشرف)
   const fetchVolunteers = async () => {
     try {
       const response = await axiosClient.get('/admin/volunteers/all');
@@ -82,14 +88,12 @@ export default function ManageActivities() {
         time_slot: formData.time_slot
       }));
 
-      // إنشاء النشاط
       const response = await axiosClient.post('/activities', {
         title: formData.title,
         description: formData.description,
         sessions: sessionsData,
       });
 
-      // تعيين المشرف للجلسات التي تم إنشاؤها
       const createdSessions = response.data.activity?.sessions || [];
       if (createdSessions.length > 0) {
         const sessionPromises = createdSessions.map(session => 
@@ -103,10 +107,7 @@ export default function ManageActivities() {
         setMessage({ type: 'success', text: 'تم إنشاء النشاط بنجاح!' });
       }
 
-      // إعادة جلب الجلسات لتحديث الجدول
       await fetchActivities();
-
-      // تصفير النموذج
       setFormData({ title: '', description: '', selectedDays: [], time_slot: '' });
       setSelectedSupervisorId('');
 
@@ -117,10 +118,52 @@ export default function ManageActivities() {
     }
   };
 
+  // فتح نافذة التعديل من داخل نافذة التفاصيل
+  const handleEditClick = () => {
+    setEditingActivity(selectedActivity);
+    setEditFormData({
+      title: selectedActivity.activity?.title || '',
+      description: selectedActivity.activity?.description || '',
+      time_slot: selectedActivity.time_slot || '',
+      day_of_week: selectedActivity.day_of_week || '',
+      supervisor_id: selectedActivity.supervisor_id || '',
+    });
+    setIsEditModalOpen(true);
+  };
+
+  // حفظ التعديل
+  const handleUpdateActivity = async (e) => {
+    e.preventDefault();
+    setIsUpdating(true);
+    setMessage({ type: '', text: '' });
+
+    try {
+      // بناءً على Postman: PATCH /admin/activities/{id}
+      await axiosClient.patch(`/admin/activities/${editingActivity.activity_id || editingActivity.id}`, {
+        title: editFormData.title,
+        description: editFormData.description,
+        sessions: [{
+          day_of_week: editFormData.day_of_week,
+          time_slot: editFormData.time_slot,
+          supervisor_id: parseInt(editFormData.supervisor_id)
+        }]
+      });
+      
+      setMessage({ type: 'success', text: 'تم تعديل النشاط بنجاح!' });
+      setIsEditModalOpen(false);
+      setSelectedActivity(null); // إغلاق نافذة التفاصيل أيضاً
+      await fetchActivities();
+      
+    } catch (error) {
+      setMessage({ type: 'error', text: error.response?.data?.message || 'فشل التعديل.' });
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
   return (
     <div className="space-y-8">
-      
-      {/* ================= نموذج إضافة النشاط ================= */}
+      {/* نموذج إضافة النشاط */}
       <div className="bg-white p-6 lg:p-8 rounded-2xl border border-gray-100 shadow-sm">
         <div className="flex items-center gap-3 mb-6">
           <div className="p-3 bg-brand-50 text-brand-600 rounded-xl"><Plus className="w-6 h-6" /></div>
@@ -181,7 +224,7 @@ export default function ManageActivities() {
         </form>
       </div>
 
-      {/* ================= الجدول الأسبوعي (من الباك إند) ================= */}
+      {/* الجدول الأسبوعي */}
       <div className="bg-white p-6 lg:p-8 rounded-2xl border border-gray-100 shadow-sm">
         <h2 className="text-xl font-bold text-gray-800 mb-6 flex items-center gap-2"><CalendarDays className="w-6 h-6" /> البرنامج الأسبوعي</h2>
         
@@ -208,10 +251,10 @@ export default function ManageActivities() {
                       dayActivities.map((act, idx) => (
                         <div 
                           key={idx} 
-                          onClick={() => setSelectedActivity(act)} // فتح النافذة عند الضغط
-                          className="bg-white p-3 rounded-lg border border-brand-100 shadow-sm flex flex-col gap-2 cursor-pointer hover:shadow-md hover:border-brand-300 transition-all"
+                          onClick={() => setSelectedActivity(act)}
+                          className="bg-white p-3 rounded-lg border border-brand-100 shadow-sm flex flex-col gap-2 cursor-pointer hover:shadow-md hover:border-brand-300 transition-all group relative"
                         >
-                          <p className="font-bold text-brand-700 text-sm leading-tight">
+                          <p className="font-bold text-brand-700 text-sm leading-tight pr-6">
                             {act.activity?.title || 'بدون اسم'}
                           </p>
                           
@@ -237,14 +280,11 @@ export default function ManageActivities() {
         )}
       </div>
 
-      {/* ================= نافذة تفاصيل النشاط (Modal) ================= */}
-      {selectedActivity && (
+      {/* نافذة تفاصيل النشاط (Modal) */}
+      {selectedActivity && !isEditModalOpen && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-lg p-6 shadow-xl relative animate-in fade-in zoom-in duration-200">
-            <button 
-              onClick={() => setSelectedActivity(null)} 
-              className="absolute top-4 left-4 text-gray-400 hover:text-gray-600"
-            >
+          <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-xl relative animate-in fade-in zoom-in duration-200">
+            <button onClick={() => setSelectedActivity(null)} className="absolute top-4 left-4 text-gray-400 hover:text-gray-600">
               <X className="w-5 h-5" />
             </button>
 
@@ -253,35 +293,61 @@ export default function ManageActivities() {
                 <CalendarDays className="w-8 h-8" />
               </div>
               <h3 className="text-2xl font-bold text-gray-800">{selectedActivity.activity?.title}</h3>
-              <p className="text-sm text-gray-500 mt-1">
-                {DAYS_OF_WEEK.find(d => d.id === selectedActivity.day_of_week)?.label} | {selectedActivity.time_slot}
-              </p>
+              <p className="text-sm text-gray-500 mt-1">{DAYS_OF_WEEK.find(d => d.id === selectedActivity.day_of_week)?.label} | {selectedActivity.time_slot}</p>
             </div>
 
-            <div className="space-y-4">
+            <div className="space-y-4 mb-6">
               <div className="flex items-start gap-3">
-                <BookOpen className="w-5 h-5 text-gray-400 mt-0.5" />
+                <FileText className="w-5 h-5 text-gray-400 mt-0.5" />
                 <div>
                   <h4 className="text-sm font-bold text-gray-800 mb-1">الوصف</h4>
-                  <p className="text-sm text-gray-600 leading-relaxed">
-                    {selectedActivity.activity?.description || 'لا يوجد وصف.'}
-                  </p>
+                  <p className="text-sm text-gray-600">{selectedActivity.activity?.description || 'لا يوجد وصف.'}</p>
                 </div>
               </div>
-
               <div className="flex items-start gap-3">
                 <User className="w-5 h-5 text-gray-400 mt-0.5" />
                 <div>
                   <h4 className="text-sm font-bold text-gray-800 mb-1">المشرف</h4>
-                  <p className="text-sm text-gray-600">
-                    {selectedActivity.supervisor?.name || 'لم يتم تعيين مشرف بعد.'}
-                  </p>
-                  {selectedActivity.supervisor?.phone && (
-                    <p className="text-xs text-gray-500 mt-1" dir="ltr">{selectedActivity.supervisor.phone}</p>
-                  )}
+                  <p className="text-sm text-gray-600">{selectedActivity.supervisor?.name || 'لم يتم تعيين مشرف بعد.'}</p>
                 </div>
               </div>
             </div>
+
+            <button 
+              onClick={handleEditClick}
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 rounded-xl transition-all shadow-lg shadow-blue-500/30 flex items-center justify-center gap-2"
+            >
+              <Edit className="w-5 h-5" /> تعديل النشاط
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* نافذة تعديل النشاط (Modal) */}
+      {isEditModalOpen && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-xl relative">
+            <button onClick={() => setIsEditModalOpen(false)} className="absolute top-4 left-4 text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
+            <h3 className="text-xl font-bold text-gray-800 mb-6">تعديل النشاط</h3>
+
+            <form onSubmit={handleUpdateActivity} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">اسم النشاط</label>
+                <input type="text" required value={editFormData.title} onChange={(e) => setEditFormData({...editFormData, title: e.target.value})} className="w-full px-4 py-2.5 rounded-xl border border-gray-200" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">الوصف</label>
+                <input type="text" required value={editFormData.description} onChange={(e) => setEditFormData({...editFormData, description: e.target.value})} className="w-full px-4 py-2.5 rounded-xl border border-gray-200" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">الوقت</label>
+                <input type="text" required value={editFormData.time_slot} onChange={(e) => setEditFormData({...editFormData, time_slot: e.target.value})} dir="ltr" className="w-full px-4 py-2.5 rounded-xl border border-gray-200" />
+              </div>
+              
+              <button type="submit" disabled={isUpdating} className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-xl font-medium disabled:opacity-70 flex justify-center items-center gap-2 mt-4">
+                {isUpdating ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Save className="w-4 h-4" /> حفظ التعديلات</>}
+              </button>
+            </form>
           </div>
         </div>
       )}
